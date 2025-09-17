@@ -186,6 +186,7 @@ def extract_correct_category(category: str) -> str:
     category_map = current_app.config.get('mapping_categories', {})
     for key, mapped_categories in category_map.items():
         if category.lower() in mapped_categories:
+            print("Mapping categoria", category, "corrisponde a", key)
             category = key
             break
     return category
