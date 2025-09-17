@@ -120,8 +120,10 @@ def add_download():
         links = data.get('links', [])
         category = data.get('category', 'other')
         auto_start = data.get('auto_start', True)
+        # NON appare il print
         print(f"Aggiungo: {name}: {len(links)} link. Categoria: {category}. {"Autostart" if auto_start else "No autostart"}")
         # Create and validate download request
+        # NON estrare la categoria corretta... perchè?????
         category = extract_correct_category(category)
         name = clean_name(name)
         download_request = DownloadRequest(name=name, links=links, category=category, auto_start=auto_start)
@@ -187,6 +189,7 @@ def extract_correct_category(category: str) -> str:
     for key, mapped_categories in category_map.items():
         if category.lower() in mapped_categories:
             print("Mapping categoria", category, "corrisponde a", key)
+            logger.info(f"Trovato {category} in {mapped_categories} --> {key}")
             category = key
             break
     return category
