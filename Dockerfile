@@ -13,4 +13,4 @@ RUN pip3 install -r requirements.txt
 
 COPY . .
 
-CMD [ "python3", "main_app.py", "--host", "production"]
+CMD [ "python3", "main_app.py", "--mode", "production", "--port", "8080", "--host", "0.0.0.0" ]
