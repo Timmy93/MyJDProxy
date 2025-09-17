@@ -64,7 +64,7 @@ class MyJDClient:
         download_links: List[str], 
         category: str = "other",
         auto_start: bool = True
-    ) -> bool:
+    ) -> Dict[str, Optional[str]]:
         """
         Add a download package to MyJDownloader.
         
@@ -77,35 +77,39 @@ class MyJDClient:
         Returns:
             bool: Success status
         """
+        result = {
+            "success": False,
+            "message": ""
+        }
         if not self.is_connected():
-            raise MyJDConnectionError("Not connected to MyJDownloader")
-        
-        if not download_links:
-            raise ValueError("No download links provided")
-        
-        if category not in self.config.allowed_categories:
-            raise ValueError(
-                f"Invalid category: {category}. "
-                f"Allowed categories: {', '.join(self.config.allowed_categories)}"
-            )
-        
-        try:
-            destination_folder = os.path.join(self.config.base_path, category)
+            self.logger.warning("Not connected to MyJDownloader")
+            result["message"] = "Not connected to MyJDownloader"
+        elif not download_links:
+            self.logger.warning("No download links provided")
+            result["message"] = "No download links provided"
+        elif category not in self.config.allowed_categories:
+            self.logger.warning(f"Invalid category provided [{category}]. Cannot request download")
+            result["message"] = "Invalid category"
+        else:
+            try:
+                destination_folder = os.path.join(self.config.base_path, category)
+                package = {
+                    "packageName": name,
+                    "links": "\n".join(download_links),
+                    "destinationFolder": destination_folder,
+                    "autostart": "true" if auto_start else "false"
+                }
+                print(f"Adding package: {package}")
+                self.device.linkgrabber.add_links([package])
+                self.logger.info(f"Added download package '{name}' with {len(download_links)} links")
+                result["success"] = True
+                result["message"] = f"Package '{name}' added successfully"
+            except Exception as e:
+                self.logger.error(f"Failed to add download package: {str(e)}")
+                raise MyJDOperationError(f"Failed to add package: {str(e)}")
+        return result
             
-            package = {
-                "packageName": name,
-                "links": "\n".join(download_links),
-                "destinationFolder": destination_folder,
-                "autostart": "true" if auto_start else "false"
-            }
-            print(f"Adding package: {package}")
-            self.device.linkgrabber.add_links([package])
-            self.logger.info(f"Added download package '{name}' with {len(download_links)} links")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to add download package: {str(e)}")
-            raise MyJDOperationError(f"Failed to add package: {str(e)}")
+
     
     def get_download_packages(self) -> List[DownloadPackage]:
         """

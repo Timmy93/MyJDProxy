@@ -96,6 +96,9 @@ def disconnect():
         }), 500
 
 
+def clean_name(name):
+    pass
+
 @api_bp.route('/downloads', methods=['POST'])
 def add_download():
     """Add a new download package."""
@@ -110,18 +113,17 @@ def add_download():
         links = data.get('links', [])
         category = data.get('category', 'other')
         auto_start = data.get('auto_start', True)
-        print(f"Aggiungo: {links}, {name}, {category}, {auto_start}")
+        print(f"Aggiungo: {name}: {len(links)} link. Categoria: {category}. {"Autostart" if auto_start else "No autostart"}")
         # Create and validate download request
-        download_request = DownloadRequest(
-            name=name,
-            links=links,
-            category=category,
-            auto_start=auto_start
-        )
-        
+        category = extract_correct_category(category)
+        name = clean_name(name)
+        download_request = DownloadRequest(name=name, links=links, category=category, auto_start=auto_start)
         client = get_myjd_client()
-        
-        if not download_request.validate(client.config.allowed_categories):
+
+        valid_request = download_request.validate(
+            client.config.allowed_categories,
+        )
+        if not valid_request:
             raise ValidationError("Invalid download request data")
         
         # Add download package
@@ -171,6 +173,15 @@ def add_download():
             'error': 'internal_error',
             'message': 'Internal server error'
         }), 500
+
+
+def extract_correct_category(category: str) -> str:
+    category_map = current_app.config.get('CATEGORY_MAP', {})
+    for key, mapped_categories in category_map.items():
+        if category.lower() in mapped_categories:
+            category = key
+            break
+    return category
 
 
 @api_bp.route('/downloads', methods=['GET'])

@@ -9,22 +9,25 @@ import sys
 import logging
 from logging.handlers import RotatingFileHandler
 from app import create_app
+from app.core.config_manager import Config
 from app.utils.exceptions import MyJDConnectionError, ConfigurationError
 
 # Add the project root to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-def setup_logging(app):
+def setup_logging(created_app, log_dir='/logs'):
     """Setup logging configuration."""
-    if not app.debug:
+    log_file_name = 'myjdownloader_api.log'
+    log_path = os.path.join(log_dir, log_file_name)
+    if not created_app.debug:
         # Ensure logs directory exists
-        if not os.path.exists('logs'):
-            os.mkdir('logs')
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
 
         # Setup file handler
         file_handler = RotatingFileHandler(
-            'logs/myjdownloader_api.log',
+            log_path,
             maxBytes=10240000,  # 10MB
             backupCount=10
         )
@@ -32,10 +35,10 @@ def setup_logging(app):
             '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
         ))
         file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
+        created_app.logger.addHandler(file_handler)
 
-        app.logger.setLevel(logging.INFO)
-        app.logger.info('MyJDownloader API startup')
+        created_app.logger.setLevel(logging.INFO)
+        created_app.logger.info('MyJDownloader API startup')
 
 
 def initialize_myjd_connection(app):
@@ -61,13 +64,14 @@ def initialize_myjd_connection(app):
 def create_application():
     """Create and configure the Flask application."""
     try:
-        app = create_app()
-        setup_logging(app)
+        config = Config()
+        created_app = create_app(config)
+        setup_logging(created_app, config.logs_path)
 
         # Try to connect to MyJDownloader on startup
-        initialize_myjd_connection(app)
+        initialize_myjd_connection(created_app)
 
-        return app
+        return created_app
 
     except ConfigurationError as e:
         print(f"Configuration error: {str(e)}")

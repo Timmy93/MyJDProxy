@@ -12,14 +12,13 @@ from app.core.myjd_client import MyJDClient
 __version__ = '1.0.0'
 
 
-def create_app():
+def create_app(config: Config):
     """Application factory function."""
     app = Flask(__name__)
 
     # Load configuration
     try:
-        config = Config()
-        app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
+        app.config['SECRET_KEY'] = config.secret_key
         app.config['JSON_SORT_KEYS'] = False
 
         # Initialize MyJD client

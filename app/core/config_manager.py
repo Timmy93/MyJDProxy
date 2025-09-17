@@ -52,6 +52,21 @@ class Config:
     def allowed_categories(self) -> List[str]:
         """Get allowed download categories."""
         return self._config_data.get('Downloads', {}).get('allowed_categories', ['other'])
+
+    @property
+    def secret_key(self) -> str:
+        """Get secret key for Flask application."""
+        return self._config_data.get('App', {}).get('secret_key', 'ABpoP70Jtb2HXD0f4hYwY0oQ')
+
+    @property
+    def logs_path(self) -> str:
+        """Get logs path."""
+        return self._config_data.get('App', {}).get('logs_path', '/logs')
+
+    @property
+    def mapping_categories(self) -> dict:
+        """Get category mappings."""
+        return self._config_data.get('Downloads', {}).get('mapping_categories', {})
     
     def validate(self) -> bool:
         """Validate configuration completeness."""

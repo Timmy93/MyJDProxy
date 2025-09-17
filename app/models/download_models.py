@@ -1,7 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-
-
+import logging
 class DownloadStatus(Enum):
     """Download status enumeration."""
     UNKNOWN = "unknown"
@@ -111,16 +110,20 @@ class DownloadRequest:
     links: list
     category: str = "other"
     auto_start: bool = True
+    logger = logging.getLogger("DownloadRequestValidator")
     
     def validate(self, allowed_categories: list) -> bool:
         """Validate the download request."""
         if not self.name.strip():
+            self.logger.warning("Download name is empty.")
             return False
         
         if not self.links or not isinstance(self.links, list):
+            self.logger.warning("Download links are invalid or empty.")
             return False
         
         if self.category not in allowed_categories:
+            self.logger.warning(f"Category '{self.category}' is not allowed.")
             return False
         
         return True
