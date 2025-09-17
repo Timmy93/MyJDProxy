@@ -188,7 +188,6 @@ def extract_correct_category(category: str) -> str:
     category_map = client.config.mapping_categories
     for key, mapped_categories in category_map.items():
         if category.lower() in mapped_categories:
-            current_app.logger.info("Mapping categoria", category, "corrisponde a", key)
             current_app.logger.info(f"Trovato {category} in {mapped_categories} --> {key}")
             category = key
             break
