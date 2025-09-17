@@ -1,4 +1,6 @@
 import logging
+from logging import Logger
+
 from flask import Blueprint, request, jsonify, current_app
 import re
 from app.models.download_models import DownloadRequest
@@ -9,8 +11,6 @@ from app.utils.exceptions import (
 )
 
 api_bp = Blueprint('api', __name__)
-logger = logging.getLogger(__name__)
-
 
 def get_myjd_client():
     """Get MyJDownloader client from Flask app."""
@@ -31,7 +31,7 @@ def health_check():
         }), 200 if is_connected else 503
         
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+        current_app.logger.error(f"Health check failed: {str(e)}")
         return jsonify({
             'status': 'error',
             'connected': False,
@@ -59,7 +59,7 @@ def connect():
         }), 200
         
     except MyJDConnectionError as e:
-        logger.error(f"Connection error: {str(e)}")
+        current_app.logger.error(f"Connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
@@ -67,7 +67,7 @@ def connect():
         }), 400
         
     except Exception as e:
-        logger.error(f"Unexpected error during connection: {str(e)}")
+        current_app.logger.error(f"Unexpected error during connection: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -88,7 +88,7 @@ def disconnect():
         }), 200
         
     except Exception as e:
-        logger.error(f"Error during disconnection: {str(e)}")
+        current_app.logger.error(f"Error during disconnection: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -121,9 +121,8 @@ def add_download():
         category = data.get('category', 'other')
         auto_start = data.get('auto_start', True)
         # NON appare il print
-        print(f"Aggiungo: {name}: {len(links)} link. Categoria: {category}. {"Autostart" if auto_start else "No autostart"}")
+        current_app.logger.debug(f"Aggiungo: {name}: {len(links)} link. Categoria: {category}. {'Autostart' if auto_start else 'No autostart'}")
         # Create and validate download request
-        # NON estrare la categoria corretta... perchè?????
         category = extract_correct_category(category)
         name = clean_name(name)
         download_request = DownloadRequest(name=name, links=links, category=category, auto_start=auto_start)
@@ -152,7 +151,7 @@ def add_download():
         }), 201
         
     except ValidationError as e:
-        logger.warning(f"Validation error: {str(e)}")
+        current_app.logger.warning(f"Validation error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'validation_error',
@@ -160,7 +159,7 @@ def add_download():
         }), 400
         
     except MyJDConnectionError as e:
-        logger.error(f"Connection error: {str(e)}")
+        current_app.logger.error(f"Connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
@@ -168,7 +167,7 @@ def add_download():
         }), 503
         
     except MyJDOperationError as e:
-        logger.error(f"Operation error: {str(e)}")
+        current_app.logger.error(f"Operation error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'operation_error',
@@ -176,7 +175,7 @@ def add_download():
         }), 400
         
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -185,11 +184,12 @@ def add_download():
 
 
 def extract_correct_category(category: str) -> str:
-    category_map = current_app.config.get('mapping_categories', {})
+    client = get_myjd_client()
+    category_map = client.config.mapping_categories
     for key, mapped_categories in category_map.items():
         if category.lower() in mapped_categories:
-            print("Mapping categoria", category, "corrisponde a", key)
-            logger.info(f"Trovato {category} in {mapped_categories} --> {key}")
+            current_app.logger.info("Mapping categoria", category, "corrisponde a", key)
+            current_app.logger.info(f"Trovato {category} in {mapped_categories} --> {key}")
             category = key
             break
     return category
@@ -212,7 +212,7 @@ def get_downloads():
         }), 200
         
     except MyJDConnectionError as e:
-        logger.error(f"Connection error: {str(e)}")
+        current_app.logger.error(f"Connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
@@ -220,7 +220,7 @@ def get_downloads():
         }), 503
         
     except MyJDOperationError as e:
-        logger.error(f"Operation error: {str(e)}")
+        current_app.logger.error(f"Operation error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'operation_error',
@@ -228,7 +228,7 @@ def get_downloads():
         }), 400
         
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -254,7 +254,7 @@ def start_downloads():
         }), 200
         
     except MyJDConnectionError as e:
-        logger.error(f"Connection error: {str(e)}")
+        current_app.logger.error(f"Connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
@@ -262,7 +262,7 @@ def start_downloads():
         }), 503
         
     except MyJDOperationError as e:
-        logger.error(f"Operation error: {str(e)}")
+        current_app.logger.error(f"Operation error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'operation_error',
@@ -270,7 +270,7 @@ def start_downloads():
         }), 400
         
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -296,7 +296,7 @@ def pause_downloads():
         }), 200
         
     except MyJDConnectionError as e:
-        logger.error(f"Connection error: {str(e)}")
+        current_app.logger.error(f"Connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
@@ -304,7 +304,7 @@ def pause_downloads():
         }), 503
         
     except MyJDOperationError as e:
-        logger.error(f"Operation error: {str(e)}")
+        current_app.logger.error(f"Operation error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'operation_error',
@@ -312,7 +312,7 @@ def pause_downloads():
         }), 400
         
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -334,7 +334,7 @@ def get_linkgrabber():
         }), 200
         
     except MyJDConnectionError as e:
-        logger.error(f"Connection error: {str(e)}")
+        current_app.logger.error(f"Connection error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'connection_error',
@@ -342,7 +342,7 @@ def get_linkgrabber():
         }), 503
         
     except MyJDOperationError as e:
-        logger.error(f"Operation error: {str(e)}")
+        current_app.logger.error(f"Operation error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'operation_error',
@@ -350,7 +350,7 @@ def get_linkgrabber():
         }), 400
         
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',
@@ -376,7 +376,7 @@ def get_config_info():
         }), 200
         
     except Exception as e:
-        logger.error(f"Error getting config info: {str(e)}")
+        current_app.logger.error(f"Error getting config info: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'internal_error',

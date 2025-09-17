@@ -26,6 +26,7 @@ def create_app(config: Config):
         # Initialize MyJD client
         myjd_client = MyJDClient(config)
         app.myjd_client = myjd_client
+        app.my_config = config
 
         # Register blueprints
         app.register_blueprint(api_bp, url_prefix='/api')

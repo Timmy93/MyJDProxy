@@ -36,29 +36,27 @@ def setup_logging(created_app, log_dir='/logs'):
         ))
         file_handler.setLevel(logging.INFO)
         created_app.logger.addHandler(file_handler)
-
         created_app.logger.setLevel(logging.INFO)
         created_app.logger.info('MyJDownloader API startup')
 
-
-def initialize_myjd_connection(app):
+def initialize_myjd_connection(created_app):
     """Initialize MyJDownloader connection on startup."""
     try:
-        with app.app_context():
-            client = app.myjd_client
+        with created_app.app_context():
+            client = created_app.myjd_client
             if not client.is_connected():
-                app.logger.info("Attempting to connect to MyJDownloader...")
+                created_app.logger.info("Attempting to connect to MyJDownloader...")
                 client.connect()
-                app.logger.info("Successfully connected to MyJDownloader")
+                created_app.logger.info("Successfully connected to MyJDownloader")
             else:
-                app.logger.info("MyJDownloader client already connected")
+                created_app.logger.info("MyJDownloader client already connected")
 
     except MyJDConnectionError as e:
-        app.logger.warning(f"Could not connect to MyJDownloader on startup: {str(e)}")
-        app.logger.info("Connection will be attempted when first API call is made")
+        created_app.logger.warning(f"Could not connect to MyJDownloader on startup: {str(e)}")
+        created_app.logger.info("Connection will be attempted when first API call is made")
 
     except Exception as e:
-        app.logger.error(f"Unexpected error during MyJDownloader initialization: {str(e)}")
+        created_app.logger.error(f"Unexpected error during MyJDownloader initialization: {str(e)}")
 
 
 def create_application():
@@ -136,7 +134,6 @@ def cleanup(error):
     if error:
         app.logger.error(f'App context teardown with error: {str(error)}')
 
-
 def run_development_server():
     """Run the development server."""
     print("=" * 50)
@@ -153,7 +150,6 @@ def run_development_server():
         debug=True,
         threaded=True
     )
-
 
 def run_production_server():
     """Run the production server using Waitress."""
