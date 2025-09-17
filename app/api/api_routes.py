@@ -1,6 +1,6 @@
 import logging
 from flask import Blueprint, request, jsonify, current_app
-
+import re
 from app.models.download_models import DownloadRequest
 from app.utils.exceptions import (
     MyJDConnectionError, 
@@ -96,8 +96,15 @@ def disconnect():
         }), 500
 
 
-def clean_name(name):
-    pass
+def clean_name(name: str) -> str:
+    """Clean and standardize the download package name."""
+    # TODO: utilizzare un json/toml di config per definire le sostituzioni
+    def _repl(m):
+        num = m.group(1)
+        return 'S' + num.zfill(2)
+    # match case-insensitive 'Stagione' seguito da separatori opzionali e da un numero
+    name = re.sub(r'(?i)\bStagione[\s\-_:]*([0-9]+)\b', _repl, name)
+    return name
 
 @api_bp.route('/downloads', methods=['POST'])
 def add_download():
@@ -176,7 +183,7 @@ def add_download():
 
 
 def extract_correct_category(category: str) -> str:
-    category_map = current_app.config.get('CATEGORY_MAP', {})
+    category_map = current_app.config.get('mapping_categories', {})
     for key, mapped_categories in category_map.items():
         if category.lower() in mapped_categories:
             category = key

@@ -2,6 +2,7 @@
 """
 MyJDownloader API Application Package
 """
+import secrets
 
 from flask import Flask
 
@@ -18,7 +19,8 @@ def create_app(config: Config):
 
     # Load configuration
     try:
-        app.config['SECRET_KEY'] = config.secret_key
+        secret = config.secret_key if config.secret_key else secrets.token_urlsafe(32)
+        app.config['SECRET_KEY'] = secret
         app.config['JSON_SORT_KEYS'] = False
 
         # Initialize MyJD client

@@ -56,7 +56,7 @@ class Config:
     @property
     def secret_key(self) -> str:
         """Get secret key for Flask application."""
-        return self._config_data.get('App', {}).get('secret_key', 'ABpoP70Jtb2HXD0f4hYwY0oQ')
+        return self._config_data.get('App', {}).get('secret_key')
 
     @property
     def logs_path(self) -> str:
