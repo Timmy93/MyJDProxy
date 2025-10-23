@@ -2,6 +2,7 @@ import os
 import logging
 from typing import List, Dict, Optional
 from myjdapi import Myjdapi
+from myjdapi.exception import MYJDTokenInvalidException
 
 from app.core.config_manager import Config
 from app.models.download_models import DownloadPackage, DownloadStatus
@@ -58,10 +59,33 @@ class MyJDClient:
         """Check if client is connected."""
         return self._is_connected and self.device is not None
     
+    def _refresh_connection(self) -> bool:
+        """
+        Refresh the connection token using reconnect.
+        
+        Returns:
+            bool: True if reconnection was successful, False otherwise.
+        """
+        try:
+            self.logger.info("Attempting to refresh expired token...")
+            self.jd.reconnect()
+            self.logger.info("Token refreshed successfully")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to refresh token: {str(e)}")
+            # If reconnect fails, try a full reconnect
+            try:
+                self.logger.info("Reconnect failed, attempting full connection...")
+                self.connect()
+                return True
+            except Exception as connect_error:
+                self.logger.error(f"Full connection also failed: {str(connect_error)}")
+                return False
+    
     def add_download_package(
-        self, 
-        name: str, 
-        download_links: List[str], 
+        self,
+        name: str,
+        download_links: List[str],
         category: str = "other",
         auto_start: bool = True
     ) -> Dict[str, Optional[str]]:
@@ -75,7 +99,7 @@ class MyJDClient:
             auto_start: Whether to auto-start the download
             
         Returns:
-            bool: Success status
+            dict: Result with 'success' and 'message' keys
         """
         result = {
             "success": False,
@@ -107,7 +131,7 @@ class MyJDClient:
                     "autostart": "true" if auto_start else "false"
                 }
                 print(f"Adding package: {package}")
-                self.device.linkgrabber.add_links([package])
+                self._add_links_with_retry(package)
                 self.logger.info(f"Added download package '{name}' with {len(download_links)} links")
                 result["success"] = True
                 result["message"] = f"Package '{name}' added successfully"
@@ -115,6 +139,31 @@ class MyJDClient:
                 self.logger.error(f"Failed to add download package: {str(e)}")
                 raise MyJDOperationError(f"Failed to add package: {str(e)}")
         return result
+    
+    def _add_links_with_retry(self, package: dict, retry_count: int = 0) -> None:
+        """
+        Add links to linkgrabber with automatic retry on token expiration.
+        
+        Args:
+            package: Package dictionary with links and metadata
+            retry_count: Current retry attempt (used internally)
+            
+        Raises:
+            MyJDOperationError: If the operation fails after retry
+        """
+        try:
+            self.device.linkgrabber.add_links([package])
+        except MYJDTokenInvalidException as e:
+            if retry_count == 0:
+                self.logger.warning(f"Token invalid error detected: {str(e)}")
+                if self._refresh_connection():
+                    self.logger.info("Retrying add_links after token refresh...")
+                    self._add_links_with_retry(package, retry_count=1)
+                else:
+                    raise MyJDOperationError("Failed to refresh connection after token expiration")
+            else:
+                self.logger.error("Token still invalid after refresh attempt")
+                raise MyJDOperationError(f"Token invalid even after reconnection: {str(e)}")
             
 
     
@@ -129,7 +178,7 @@ class MyJDClient:
             raise MyJDConnectionError("Not connected to MyJDownloader")
         
         try:
-            packages = self.device.downloads.query_packages()
+            packages = self._query_packages_with_retry()
             
             download_packages = []
             for pkg in packages:
@@ -150,22 +199,95 @@ class MyJDClient:
             self.logger.error(f"Failed to get download packages: {str(e)}")
             raise MyJDOperationError(f"Failed to get packages: {str(e)}")
     
+    def _query_packages_with_retry(self, retry_count: int = 0) -> List[Dict]:
+        """
+        Query download packages with automatic retry on token expiration.
+        
+        Args:
+            retry_count: Current retry attempt (used internally)
+            
+        Returns:
+            List[Dict]: List of package dictionaries
+            
+        Raises:
+            MyJDOperationError: If the operation fails after retry
+        """
+        try:
+            return self.device.downloads.query_packages()
+        except MYJDTokenInvalidException as e:
+            if retry_count == 0:
+                self.logger.warning(f"Token invalid error detected in query_packages: {str(e)}")
+                if self._refresh_connection():
+                    self.logger.info("Retrying query_packages after token refresh...")
+                    return self._query_packages_with_retry(retry_count=1)
+                else:
+                    raise MyJDOperationError("Failed to refresh connection after token expiration")
+            else:
+                self.logger.error("Token still invalid after refresh attempt")
+                raise MyJDOperationError(f"Token invalid even after reconnection: {str(e)}")
+    
     def get_linkgrabber_packages(self) -> List[Dict]:
         """Get packages in linkgrabber (pending downloads)."""
         if not self.is_connected():
             raise MyJDConnectionError("Not connected to MyJDownloader")
         
         try:
-            return self.device.linkgrabber.query_packages()
+            return self._query_linkgrabber_with_retry()
         except Exception as e:
             self.logger.error(f"Failed to get linkgrabber packages: {str(e)}")
             raise MyJDOperationError(f"Failed to get linkgrabber packages: {str(e)}")
+    
+    def _query_linkgrabber_with_retry(self, retry_count: int = 0) -> List[Dict]:
+        """
+        Query linkgrabber packages with automatic retry on token expiration.
+        
+        Args:
+            retry_count: Current retry attempt (used internally)
+            
+        Returns:
+            List[Dict]: List of linkgrabber package dictionaries
+            
+        Raises:
+            MyJDOperationError: If the operation fails after retry
+        """
+        try:
+            return self.device.linkgrabber.query_packages()
+        except MYJDTokenInvalidException as e:
+            if retry_count == 0:
+                self.logger.warning(f"Token invalid error detected in linkgrabber query: {str(e)}")
+                if self._refresh_connection():
+                    self.logger.info("Retrying linkgrabber query after token refresh...")
+                    return self._query_linkgrabber_with_retry(retry_count=1)
+                else:
+                    raise MyJDOperationError("Failed to refresh connection after token expiration")
+            else:
+                self.logger.error("Token still invalid after refresh attempt")
+                raise MyJDOperationError(f"Token invalid even after reconnection: {str(e)}")
     
     def start_downloads(self, package_ids: Optional[List[str]] = None) -> bool:
         """Start downloads for specific packages or all packages."""
         if not self.is_connected():
             raise MyJDConnectionError("Not connected to MyJDownloader")
         
+        try:
+            self._start_downloads_with_retry(package_ids)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start downloads: {str(e)}")
+            raise MyJDOperationError(f"Failed to start downloads: {str(e)}")
+    
+    def _start_downloads_with_retry(self, package_ids: Optional[List[str]] = None, retry_count: int = 0) -> None:
+        """
+        Start downloads with automatic retry on token expiration.
+        
+        Args:
+            package_ids: Optional list of package IDs to start
+            retry_count: Current retry attempt (used internally)
+            
+        Raises:
+            MyJDOperationError: If the operation fails after retry
+        """
         try:
             if package_ids:
                 # Start specific packages (implementation depends on myjdapi capabilities)
@@ -174,18 +296,42 @@ class MyJDClient:
                 # Start all downloads
                 self.device.downloadcontroller.start_downloads()
                 self.logger.info("Started all downloads")
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to start downloads: {str(e)}")
-            raise MyJDOperationError(f"Failed to start downloads: {str(e)}")
+        except MYJDTokenInvalidException as e:
+            if retry_count == 0:
+                self.logger.warning(f"Token invalid error detected in start_downloads: {str(e)}")
+                if self._refresh_connection():
+                    self.logger.info("Retrying start_downloads after token refresh...")
+                    self._start_downloads_with_retry(package_ids, retry_count=1)
+                else:
+                    raise MyJDOperationError("Failed to refresh connection after token expiration")
+            else:
+                self.logger.error("Token still invalid after refresh attempt")
+                raise MyJDOperationError(f"Token invalid even after reconnection: {str(e)}")
     
     def pause_downloads(self, package_ids: Optional[List[str]] = None) -> bool:
         """Pause downloads for specific packages or all packages."""
         if not self.is_connected():
             raise MyJDConnectionError("Not connected to MyJDownloader")
         
+        try:
+            self._pause_downloads_with_retry(package_ids)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to pause downloads: {str(e)}")
+            raise MyJDOperationError(f"Failed to pause downloads: {str(e)}")
+    
+    def _pause_downloads_with_retry(self, package_ids: Optional[List[str]] = None, retry_count: int = 0) -> None:
+        """
+        Pause downloads with automatic retry on token expiration.
+        
+        Args:
+            package_ids: Optional list of package IDs to pause
+            retry_count: Current retry attempt (used internally)
+            
+        Raises:
+            MyJDOperationError: If the operation fails after retry
+        """
         try:
             if package_ids:
                 # Pause specific packages
@@ -194,12 +340,17 @@ class MyJDClient:
                 # Pause all downloads
                 self.device.downloadcontroller.pause_downloads()
                 self.logger.info("Paused all downloads")
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to pause downloads: {str(e)}")
-            raise MyJDOperationError(f"Failed to pause downloads: {str(e)}")
+        except MYJDTokenInvalidException as e:
+            if retry_count == 0:
+                self.logger.warning(f"Token invalid error detected in pause_downloads: {str(e)}")
+                if self._refresh_connection():
+                    self.logger.info("Retrying pause_downloads after token refresh...")
+                    self._pause_downloads_with_retry(package_ids, retry_count=1)
+                else:
+                    raise MyJDOperationError("Failed to refresh connection after token expiration")
+            else:
+                self.logger.error("Token still invalid after refresh attempt")
+                raise MyJDOperationError(f"Token invalid even after reconnection: {str(e)}")
     
     def __enter__(self):
         """Context manager entry."""
