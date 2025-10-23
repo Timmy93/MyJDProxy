@@ -83,9 +83,9 @@ class MyJDClient:
                 return False
     
     def add_download_package(
-        self, 
-        name: str, 
-        download_links: List[str], 
+        self,
+        name: str,
+        download_links: List[str],
         category: str = "other",
         auto_start: bool = True
     ) -> Dict[str, Optional[str]]:
