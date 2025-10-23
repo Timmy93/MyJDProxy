@@ -81,6 +81,13 @@ class MyJDClient:
             "success": False,
             "message": ""
         }
+        try:
+            if not self.is_connected():
+                self.connect()
+        except MyJDConnectionError as e:
+            self.logger.error(f"Cannot add download package, connection error: {str(e)}")
+            result["message"] = f"Connection error: {str(e)}"
+            return result
         if not self.is_connected():
             self.logger.warning("Not connected to MyJDownloader")
             result["message"] = "Not connected to MyJDownloader"
